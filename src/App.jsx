@@ -12,7 +12,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [hoveredId, setHoveredId] = useState(null);
 
-  // 1. 初始化地圖
+  // 1. 初始化地圖(basemap)
   useEffect(() => {
     if (map.current) return;
 
@@ -32,26 +32,25 @@ function App() {
     });
 
 
-    map.current.on('load', () => {
+    map.current.on('load', () => { //run when map is loaded
 
-
-      // 初始化具有聚合功能的資料源
+      // initilaize clustering data source
       map.current.addSource('reports-src', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
-        cluster: true, // 開啟聚合
-        clusterMaxZoom: 14, // 縮放到此層級後停止聚合，顯示單點
-        clusterRadius: 50   // 聚合半徑（像素）
+        cluster: true, // open clustering
+        clusterMaxZoom: 14, // when zoom in to this scale, stop clustering and use single point
+        clusterRadius: 50  //px
       });
 
-      // 【聚合泡泡圖層】
+      // Cluster bubble layer
       map.current.addLayer({
         id: 'clusters',
         type: 'circle',
         source: 'reports-src',
         filter: ['has', 'point_count'], // 只顯示聚合點
         paint: {
-          // 根據數量變色：小於10(藍)、10-30(橘)、大於30(紅)
+          // 根據數量變色：小於10(紅)、10-30(淡紅)、大於30(粉紅)
           'circle-color': [
             'step',
             ['get', 'point_count'],
@@ -177,7 +176,7 @@ function App() {
       if (error) throw error;
       setReports(data || []);
     } catch (err) {
-      console.error('❌ 抓取失敗:', err.message);
+      console.error('抓取失敗:', err.message);
     } finally {
       setLoading(false);
     }
@@ -206,38 +205,75 @@ function App() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                <Loader2 className="animate-spin mb-2" /><p className="text-sm">資料讀取中...</p>
-              </div>
-            ) : (
-              reports.map((report) => (
-                <div 
-                  key={report.id}
-                  onMouseEnter={() => setHoveredId(report.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => {
-                    const geom = wellknown.parse(report.geom_wkt);
-                    map.current.flyTo({ center: geom.coordinates, zoom: 15 });
-                  }}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer bg-white ${
-                    hoveredId === report.id ? 'border-blue-500 shadow-md ring-1 ring-blue-500 bg-blue-50/10' : 'border-slate-100'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${report.severity === '緊急' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
-                      {report.type}
-                    </span>
-                    <span className="text-[10px] text-slate-400">{new Date(report.created_at).toLocaleDateString()}</span>
-                  </div>
-                  <p className="text-slate-700 text-sm font-medium mb-2 line-clamp-2">{report.description || '無描述內容'}</p>
-                  <div className="flex items-center text-[11px] text-slate-500">
-                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></div>
-                    {report.status}
-                  </div>
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <Loader2 className="animate-spin mb-2" />
+                <p className="text-sm">資料讀取中...</p>
                 </div>
-              ))
+            ) : (
+                reports.map((report) => {
+                // 1. 定義顏色映射表
+                const statusColors = {
+                    '待處理': 'bg-red-500',    // 紅色
+                    '處理中': 'bg-orange-500', // 橘色
+                    '已完成': 'bg-green-500',  // 綠色
+                };
+
+                // 2. 根據 report.status 取得對應顏色，若無對應則預設灰色
+                const dotColor = statusColors[report.status] || 'bg-slate-400';
+
+                // 3. 回傳 JSX
+                return (
+                    <div 
+                    key={report.id}
+                    onMouseEnter={() => setHoveredId(report.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onClick={() => {
+                        try {
+                        const geom = wellknown.parse(report.geom_wkt);
+                        map.current.flyTo({ 
+                            center: geom.coordinates, 
+                            zoom: 15,
+                            speed: 1.2 
+                        });
+                        } catch (err) {
+                        console.error("解析座標失敗:", err);
+                        }
+                    }}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer bg-white group ${
+                        hoveredId === report.id 
+                        ? 'border-blue-500 shadow-md ring-1 ring-blue-500 bg-blue-50/10' 
+                        : 'border-slate-100 hover:border-blue-300'
+                    }`}
+                    >
+                    {/* 第一列：類型標籤與日期 */}
+                    <div className="flex justify-between items-start mb-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        report.severity === '緊急' 
+                            ? 'bg-red-100 text-red-600' 
+                            : 'bg-orange-100 text-orange-600'
+                        }`}>
+                        {report.type}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                        {new Date(report.created_at).toLocaleDateString()}
+                        </span>
+                    </div>
+
+                    {/* 第二列：案件描述 (最多顯示兩行) */}
+                    <p className="text-slate-700 text-sm font-medium mb-2 line-clamp-2">
+                        {report.description || '無描述內容'}
+                    </p>
+
+                    {/* 第三列：處理狀態與動態小圓點 */}
+                    <div className="flex items-center text-[11px] text-slate-500">
+                        <div className={`w-2 h-2 rounded-full ${dotColor} mr-2 animate-pulse`}></div>
+                        {report.status || '未定義狀態'}
+                    </div>
+                    </div>
+                );
+                })
             )}
-          </div>
+            </div>
         </aside>
 
         <main className="flex-1 relative">
