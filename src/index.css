@@ -1,0 +1,22 @@
+/* 1. 必須最先引入外部 CSS */
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* 2. 接著才是 Tailwind 指令 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. 最後是您的自定義樣式 */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 確保地圖容器撐滿父元素 */
+.map-container {
+  width: 100%;
+  height: 100%;
+}
