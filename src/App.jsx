@@ -218,7 +218,7 @@ function App() {
                     '已完成': 'bg-green-500',  // 綠色
                 };
 
-                // 2. 根據 report.status 取得對應顏色，若無對應則預設灰色
+                // 2. 根據 report.status 取得對應顏色，若無對應則預設灰色。
                 const dotColor = statusColors[report.status] || 'bg-slate-400';
 
                 // 3. 回傳 JSX
